@@ -64,30 +64,10 @@ pub async fn get_matches(
     }
 }
 
-pub async fn get_messages( db: web::Data<DbState>,path: web::Path<String>) -> impl Responder {
+pub async fn get_messages(path: web::Path<String>) -> impl Responder {
     let match_id = path.into_inner();
-
-    let result = sqlx::query_as::<_, MatchRow>(
-        "SELECT *
-         FROM matches 
-         WHERE id = $1"
-    )
-    .bind(match_id)
-    .fetch_all(&db.db)
-    .await; 
-
-    match result {
-        Ok(matches) => HttpResponse::Ok().json(matches),
-        Err(e) => {
-            eprintln!("Error fetching messages: {:?}", e);
-            HttpResponse::InternalServerError().json(StatusResponse {
-                status: "error".to_string(),
-                message: Some("Failed to fetch messages".to_string()),
-            })
-        }
-    }   
-
-
+    println!("Messages: Get history for match {}", match_id);
+    HttpResponse::Ok().body(format!("Messages: Get Chat History for {}", match_id))
 }
 
 pub async fn send_message(
