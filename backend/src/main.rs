@@ -1,9 +1,19 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
+use actix_cors::Cors;
+use sqlx::PgPool;
 
+mod config;
+mod db;
 mod models;
 mod routes;
 
+use config::Config;
 use routes::{auth, feed, interactions, matches, profile};
+
+// Application state that will be shared across all handlers
+pub struct AppState {
+    pub db: PgPool,
+}
 
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().body("I'm ok")
@@ -11,9 +21,30 @@ async fn health_check() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Starting server on 127.0.0.1:8080");
-    HttpServer::new(|| {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+    
+    // Initialize logger
+    env_logger::init();
+    
+    // Load configuration
+    let config = Config::from_env();
+    
+    // Create database connection pool
+    let pool = db::create_pool()
+        .await
+        .expect("Failed to create database pool");
+    
+    println!("✅ Database connected!");
+    println!("🚀 Starting server on {}:{}", config.host, config.port);
+    
+    let server_address = format!("{}:{}", config.host, config.port);
+    
+    HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(AppState {
+                db: pool.clone(),
+            }))
             .route("/health", web::get().to(health_check))
             // Auth
             .route("/auth/phone/login", web::post().to(auth::phone_login))
@@ -45,7 +76,7 @@ async fn main() -> std::io::Result<()> {
                 web::post().to(matches::send_message),
             )
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(&server_address)?
     .run()
     .await
 }
